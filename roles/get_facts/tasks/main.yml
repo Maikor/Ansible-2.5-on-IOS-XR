@@ -1,0 +1,12 @@
+- name: get config facts and hardware
+  iosxr_facts:
+    gather_subset:
+    - config
+    - hardware
+  register: hardware
+
+- name: get all facts, except information regarding interfaces, we have special module for them!
+  iosxr_facts:
+    gather_subset:
+    - all
+    - "!interfaces"

@@ -1,0 +1,22 @@
+---
+- name: Change hostname
+  iosxr_config:
+    lines:
+      - hostname {{ inventory_hostname }}
+
+
+- name: Apply config from file
+  iosxr_config:
+    lines:
+      - "{{ lookup('file', '../common/router.conf') }}"
+    backup: yes
+    admin: yes
+
+- name: check if OSPF is configured
+  iosxr_command:
+    commands:
+      - show run | i "router ospf"
+      - show processes ospf | i "Process state"
+    wait_for:
+      - result[0] contains "router ospf 1"
+      - result[1] contains "Run"

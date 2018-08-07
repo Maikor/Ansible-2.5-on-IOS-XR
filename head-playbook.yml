@@ -1,0 +1,133 @@
+---
+- name: Configure IOS-XR devices
+  hosts: routers
+  gather_facts: no
+  connection: network_cli
+
+  tasks:
+  ############ NETCONF task ############
+    - name: enable netconf service on port 830
+      iosxr_netconf:
+        listens_on: 830
+        state: present
+
+  ############ Banner task ############
+    - name: set welcome banner to device!
+      iosxr_banner:
+        banner: login
+        text: >
+          ! Unauthorized access to device:
+          {{ inventory_hostname }} restricted.
+        #    text: >
+        #      "{{ lookup('file', 'raw_banner.txt') }}"
+        state: present
+      connection: netconf
+
+  ############ Banner task verification ############
+
+    - name: check if 2 first tasks successfully applied on device
+      iosxr_command:
+        commands:
+        - show run | begin netconf
+        - show run | include banner
+        wait_for:
+        - result[0] contains 'netconf-yang agent'
+        - result[1] contains 'banner login !'
+        - result[1] contains 'banner login MY Not EXpected message'
+        match: any
+
+  ############ Logging tasks  ############
+    - name: configure console logging level
+      iosxr_logging:
+        dest: console
+        level: debugging
+        state: present
+
+    - name: configure logging for syslog server host
+      iosxr_logging:
+        dest: host
+        name: 172.30.13.2
+        level: critical
+        state: present
+
+  ############ System task  ############
+    - name: configure hostname and domain-name (default vrf=default)
+      iosxr_system:
+        domain_name: local.cisco.com
+        domain-search:
+        - cisco.com
+        name_servers:
+        # new DNS from CloudFlare, easy to remember ;)
+        - 1.1.1.1
+        - 8.8.8.8
+        - 8.8.4.4
+
+  ############ User task  ############
+    - name: create a new user
+      iosxr_user:
+        name: ansible
+        configured_password: ansible
+        state: present
+        groups:
+          - sysadmin
+          - root-system
+
+    - name: set multiple users to group sys-admin
+      iosxr_user:
+        aggregate:
+        - name: user1
+        - name: user2
+        configured_password: cisco
+        group: sysadmin
+#      - sysadmin
+#      - root-system
+        state: present
+
+    - name: remove created users
+      iosxr_user:
+        aggregate:
+        - name: user1
+        - name: user2
+        state: absent
+
+  ############ Interface task  ############
+
+    - name: Unshut interface and set mtu
+      iosxr_interface:
+        description: link to RouterXX TenGigE0/0/0/11
+        name: TenGigE0/0/0/28
+        #        mtu: 512
+        state: present
+
+
+
+  ############ Old method connection - local task example  ############
+
+#    - name: include task
+#      iosxr_facts:
+#        gather_subset:
+#        - config
+##        provider: "{{ cli }}"
+#      register: config
+
+  roles:
+        - get_facts
+        - xr_commands
+        - xr_config
+
+
+
+  vars:
+    vars_files: xr-passes.yml
+#   variable cli could be used if connection equal to local and provider: {{ cli }} used for module.
+#   network_cli & netconf preferred method.
+    cli:
+      host: "{{ ansible_host }}"
+      username: "{{ ansible_user }}"
+      password: "{{ ansible_ssh_pass }}"
+
+    proxy_env:
+      http_proxy:
+  environment:
+    http_proxy: ""
+    https_proxy: ""

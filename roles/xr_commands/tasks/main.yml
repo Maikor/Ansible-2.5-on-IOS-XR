@@ -1,0 +1,11 @@
+- iosxr_command:
+    commands:
+      - show route ipv4
+
+
+
+- name: run multiple commands on remote nodes
+  iosxr_command:
+    commands:
+      - show clock
+      - show interfaces
